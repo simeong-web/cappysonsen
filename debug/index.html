@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cappy's Onsen — sim debug harness</title>
+<style>
+  /* Deliberately ugly. Milestone 4 is out of scope for anything that looks
+     nice; every pixel here exists to make a number or a state legible. */
+  :root{
+    --bg:#14232b;--panel:#1c2f39;--edge:#31505d;--ink:#eef0e6;--dim:#8aa3ad;
+    --yuzu:#f2b544;--good:#6cc08b;--warn:#e8c15a;--bad:#e4695c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:12px;
+    display:grid;gap:12px;grid-template-columns:300px auto 340px;align-items:start}
+  h1{font-size:14px;letter-spacing:2px;color:var(--yuzu);grid-column:1/-1}
+  h1 small{color:var(--dim);letter-spacing:0;font-weight:normal;text-transform:none}
+  section{background:var(--panel);border:1px solid var(--edge);padding:10px;margin-bottom:10px}
+  h2{font-size:10px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;
+    margin-bottom:8px;border-bottom:1px solid var(--edge);padding-bottom:4px}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+  .row b{color:var(--yuzu);font-weight:normal;text-align:right}
+  .row.big b{font-size:16px}
+  button{background:#2a4451;border:1px solid var(--edge);color:var(--ink);
+    font:inherit;padding:5px 9px;cursor:pointer;margin:2px 2px 0 0}
+  button:hover:not(:disabled){border-color:var(--yuzu)}
+  button:disabled{opacity:.35;cursor:default}
+  button.on{background:var(--yuzu);color:#14232b;border-color:var(--yuzu)}
+  input{background:#14232b;border:1px solid var(--edge);color:var(--ink);
+    font:inherit;padding:5px;width:110px}
+  label{color:var(--dim)}
+
+  /* board */
+  #board{display:grid;gap:3px;justify-content:start}
+  .tile{width:46px;height:46px;border:2px solid transparent;border-radius:6px;
+    font:600 11px/1 ui-monospace,monospace;color:#00000099;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0;margin:0}
+  .tile.sel{border-color:#fff;transform:scale(.9)}
+  .tile.hint{border-color:#ffffff55}
+  #boardwrap.locked .tile{cursor:not-allowed;opacity:.55}
+
+  /* progress */
+  .bar{height:12px;background:#101c22;border:1px solid var(--edge);margin:4px 0 8px;position:relative}
+  .bar i{display:block;height:100%;background:var(--good);transition:width .12s}
+  .bar span{position:absolute;inset:0;text-align:center;font-size:10px;line-height:10px;color:var(--ink)}
+
+  /* charms + log */
+  .charm{display:block;width:100%;text-align:left;margin:3px 0}
+  .charm em{color:var(--dim);font-style:normal;display:block;font-size:11px}
+  #owned li{list-style:none;font-size:11px;color:var(--dim);padding:1px 0}
+  #owned b{color:var(--ink);font-weight:normal}
+  #log{height:150px;overflow-y:auto;font-size:11px;color:var(--dim);
+    background:#101c22;border:1px solid var(--edge);padding:6px}
+  #log .k{color:var(--yuzu)} #log .g{color:var(--good)} #log .b{color:var(--bad)}
+  #stats{font-size:11px;white-space:pre;overflow-x:auto}
+  .over{border-color:var(--bad)}
+  .over h2{color:var(--bad)}
+  small{color:var(--dim);font-size:11px}
+</style>
+</head>
+<body>
+  <h1>CAPPY'S ONSEN · TUNING HARNESS <small>— numbers only. Art is Milestone 5.</small></h1>
+
+  <!-- ─────────────── left: controls ─────────────── -->
+  <div>
+    <section>
+      <h2>Run</h2>
+      <div class="row"><label for="seed">Seed</label><input id="seed" type="text" value="20260726"></div>
+      <button id="newrun">New run</button>
+      <button id="randomseed">Random seed</button>
+      <button id="replay">Replay seed</button>
+    </section>
+
+    <section>
+      <h2>Autoplay</h2>
+      <div>
+        <button class="spd" data-ms="-1">Off</button>
+        <button class="spd" data-ms="400">1×</button>
+        <button class="spd" data-ms="40">10×</button>
+        <button class="spd" data-ms="0">MAX</button>
+      </div>
+      <div style="margin-top:6px">
+        <button id="step">Step 1 move</button>
+        <button id="skipround">Skip round</button>
+        <button id="skiprun">Skip to death</button>
+      </div>
+      <div style="margin-top:6px">
+        <label>Policy</label>
+        <button class="pol" data-p="random">random</button>
+        <button class="pol" data-p="greedy">greedy</button>
+      </div>
+      <small id="polnote">random = a floor well below a human. greedy = a strong player.</small>
+    </section>
+
+    <section>
+      <h2>Batch — where does the wall land?</h2>
+      <div>
+        <button class="batch" data-n="20">20 runs</button>
+        <button class="batch" data-n="100">100 runs</button>
+        <button class="batch" data-n="500">500 runs</button>
+      </div>
+      <div id="stats">no batch run yet</div>
+    </section>
+  </div>
+
+  <!-- ─────────────── centre: board ─────────────── -->
+  <div>
+    <section>
+      <h2 id="roundhead">Round 1</h2>
+      <div class="bar"><i id="progress" style="width:0%"></i><span id="progresstext"></span></div>
+      <div id="boardwrap"><div id="board"></div></div>
+      <div style="margin-top:8px"><small id="hint">Click a tile, then an adjacent one.</small></div>
+    </section>
+
+    <section id="draftpanel" style="display:none">
+      <h2>Draft — take one</h2>
+      <div id="draft"></div>
+    </section>
+
+    <section id="overpanel" class="over" style="display:none">
+      <h2>Run over</h2>
+      <div id="overtext"></div>
+      <button id="again">New run</button>
+    </section>
+  </div>
+
+  <!-- ─────────────── right: readouts ─────────────── -->
+  <div>
+    <section>
+      <h2>This round</h2>
+      <div class="row big"><span>Score</span><b id="score">0</b></div>
+      <div class="row"><span>Target</span><b id="target">0</b></div>
+      <div class="row"><span>Warmth</span><b id="warmth">0</b></div>
+      <div class="row"><span>Bliss (live)</span><b id="bliss">1.00</b></div>
+      <div class="row"><span>Bliss (at round end)</span><b id="blissend">1.00</b></div>
+      <div class="row"><span>Moves left</span><b id="moves">0</b></div>
+      <div class="row"><span>Round</span><b id="round">1</b></div>
+      <div class="row"><span>Long Soak</span><b id="soak">no</b></div>
+    </section>
+
+    <section>
+      <h2>Run</h2>
+      <div class="row"><span>Total score</span><b id="total">0</b></div>
+      <div class="row"><span>Rounds cleared</span><b id="cleared">0</b></div>
+      <div class="row"><span>Charms owned</span><b id="charmcount">0</b></div>
+      <ul id="owned"></ul>
+    </section>
+
+    <section>
+      <h2>Log</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "cappys-onsen",
+    "title": "Cappy's Onsen",
+    "description": "A roguelike match-3. Soak through escalating rounds, draft a charm between each, and share a spoiler-free grid.",
+    "icon": "🛁",
+    "tags": ["puzzle", "roguelike", "daily"]
+  },
+  {
+    "id": "emberkeep",
+    "title": "Emberkeep",
+    "description": "Your hero delves the keep floor by floor, and keeps going while you are away.",
+    "icon": "🏰",
+    "tags": ["adventure", "idle"]
+  }
+]

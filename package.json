@@ -1,0 +1,25 @@
+{
+  "name": "@capy/match3-sim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cappy's Onsen — deterministic, renderer-agnostic roguelike match-3 simulation. The numbers here are the acceptance-tested source of truth; UI layers subscribe to it, never compute.",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite debug --open",
+    "build:debug": "vite build debug",
+    "game": "vite game --open",
+    "build:game": "vite build game"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "pixi.js": "^8.19.0"
+  }
+}

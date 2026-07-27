@@ -1,0 +1,8 @@
+/node_modules
+dist/
+public/games/cappys-onsen/
+.vercel
+*.local
+
+# Per-machine Claude Code permissions, not project config
+.claude/settings.local.json
