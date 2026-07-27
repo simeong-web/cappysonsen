@@ -2,7 +2,7 @@
   "name": "@capy/match3-sim",
   "version": "0.1.0",
   "private": true,
-  "description": "Cappy's Onsen — deterministic, renderer-agnostic roguelike match-3 simulation. The numbers here are the acceptance-tested source of truth; UI layers subscribe to it, never compute.",
+  "description": "Cappy's Onsen \u2014 deterministic, renderer-agnostic roguelike match-3 simulation. The numbers here are the acceptance-tested source of truth; UI layers subscribe to it, never compute.",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -21,5 +21,8 @@
   },
   "dependencies": {
     "pixi.js": "^8.19.0"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }
