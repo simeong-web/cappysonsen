@@ -1,0 +1,10 @@
+{
+  "id": "cappys-onsen",
+  "title": "Cappy's Onsen",
+  "description": "A roguelike match-3. Soak through escalating rounds, draft a charm between each, and build a run that scores in ways the last one never could. One daily board, the same for everyone, with a spoiler-free grid to share.",
+  "icon": "🛁",
+  "tags": ["puzzle", "match-3", "roguelike", "daily", "casual"],
+  "orientation": "portrait",
+  "width": 420,
+  "height": 860
+}

@@ -7,7 +7,7 @@
  * the change, never the number.
  */
 import { describe, it, expect } from "vitest";
-import { rngNext, rngRange, rngInt, rngWeighted } from "../src/rng";
+import { rngNext, rngRange, rngInt, rngWeighted } from "../src/sim/rng";
 
 describe("rngNext — pinned output", () => {
   it("emits the exact mulberry32 stream for known seeds", () => {

@@ -1,0 +1,26 @@
+name: Semgrep
+
+# Weekly, not on every PR - same cost reasoning as gitleaks.yml. Scoped to this repo
+# deliberately (see the "Audit sweep" board task) - the canonical/high-leverage repos,
+# not every already-shipped, low-churn game repo. No Semgrep account/token needed -
+# `--config auto` runs Semgrep's own free community rulesets standalone.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-26.04
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # npm-missing-minimum-release-age excluded: this repo uses pnpm, not npm, for
+      # installs - npm's min-release-age .npmrc setting doesn't apply, and pnpm 11's
+      # own equivalent (minimumReleaseAge, on by default) already covers this. See
+      # the "Review npm min-release-age" board task for the full reasoning.
+      - run: semgrep scan --config auto --error --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age

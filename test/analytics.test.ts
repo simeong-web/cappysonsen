@@ -6,11 +6,15 @@
  * picked over offered is the only signal that says a charm is dead.
  *
  * The rewarded-ad slots are tested as pure state transitions here. Whether an
- * ad ever plays is `game/telemetry.ts`'s problem, and by default it does not.
+ * ad ever plays is the client's problem, and on this platform it does not:
+ * `ADS_ENABLED` is off in every build (see `ads.test.ts`). The builders
+ * themselves outlived the port, but nothing in the shipped client emits them —
+ * the platform has no events API, so the transport was deleted; see
+ * docs/PORTING.md.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg } from "../src/config";
-import { CHARM_IDS, type CharmId } from "../src/charms";
+import { DEFAULT_CONFIG as cfg } from "../src/sim/config";
+import { CHARM_IDS, type CharmId } from "../src/sim/charms";
 import {
   draftEvents,
   pickRates,
@@ -18,7 +22,7 @@ import {
   runEnd,
   runStart,
   type AnalyticsEvent,
-} from "../src/analytics";
+} from "../src/sim/analytics";
 import {
   chooseCharm,
   newRun,
@@ -26,10 +30,10 @@ import {
   rerollOffer,
   reviveWithMoves,
   type RunState,
-} from "../src/run";
-import { newMeta, petalsFor, recordRun } from "../src/meta";
-import { swap, type BoardState, type Pos } from "../src/board";
-import { rngInt } from "../src/rng";
+} from "../src/sim/run";
+import { newMeta, petalsFor, recordRun } from "../src/sim/meta";
+import { swap, type BoardState, type Pos } from "../src/sim/board";
+import { rngInt } from "../src/sim/rng";
 
 function legalMoves(b: BoardState): [Pos, Pos][] {
   const out: [Pos, Pos][] = [];

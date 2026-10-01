@@ -7,7 +7,7 @@
  * dead board, never handed a board that is still matching).
  */
 import { describe, it, expect } from "vitest";
-import { rngInt } from "../src/rng";
+import { rngInt } from "../src/sim/rng";
 import {
   createBoard,
   swap,
@@ -27,7 +27,7 @@ import {
   type BoardState,
   type BoardEvent,
   type Pos,
-} from "../src/board";
+} from "../src/sim/board";
 
 /** Finds an event and narrows it, so assertions can read its payload directly. */
 function eventOf<T extends BoardEvent["type"]>(
@@ -207,6 +207,7 @@ describe("refill — CLAUDE.md rule 3 draw order", () => {
     expect(eventOf(out.events, "refilled").cells.map((c) => c.pos)).toEqual(order);
 
     // Untouched cells keep their tiles.
+    // oxlint-disable-next-line erasing-op -- row * cols + col, spelled out on purpose
     expect(out.state.grid[0 * 3 + 1]).toBe(1);
     expect(out.state.grid[2 * 3 + 0]).toBe(0);
   });

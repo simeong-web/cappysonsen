@@ -1,28 +1,32 @@
 {
-  "name": "@capy/match3-sim",
-  "version": "0.1.0",
+  "name": "capybara-club-cappys-onsen",
+  "version": "1.0.0",
   "private": true,
-  "description": "Cappy's Onsen \u2014 deterministic, renderer-agnostic roguelike match-3 simulation. The numbers here are the acceptance-tested source of truth; UI layers subscribe to it, never compute.",
-  "type": "module",
-  "main": "src/index.ts",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
+    "dev": "HOST_ORIGIN=http://localhost:3000 pnpm build && serve dist -l 3001",
+    "bench": "node scripts/bench.mjs && serve debug/dist -l 3002",
+    "build": "node scripts/build.mjs",
+    "test:conformance": "HOST_ORIGIN=http://localhost:3000 pnpm build && capybara-conformance-test ./dist",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "dev": "vite debug --open",
-    "build:debug": "vite build debug",
-    "game": "vite game --open",
-    "build:game": "vite build game"
-  },
-  "devDependencies": {
-    "typescript": "^7.0.2",
-    "vite": "^8.1.5",
-    "vitest": "^4.1.10"
+    "lint": "oxlint"
   },
   "dependencies": {
+    "@mittell/capybara-club-sdk": "0.3.1",
     "pixi.js": "^8.19.0"
   },
-  "engines": {
-    "node": ">=20.19"
-  }
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "oxlint": "^1.83.0",
+    "playwright": "^1.63.0",
+    "serve": "^14.2.6",
+    "typescript": "^7.0.2",
+    "vitest": "^2.1.0"
+  },
+  "packageManager": "pnpm@11.16.0"
 }

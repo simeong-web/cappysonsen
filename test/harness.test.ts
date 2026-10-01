@@ -6,9 +6,9 @@
  * about what a legal move is, would quietly poison every number in the gate.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg } from "../src/config";
-import { createBoard, swap, type Pos } from "../src/board";
-import { currentRoundScore, newRun, playMove } from "../src/run";
+import { DEFAULT_CONFIG as cfg } from "../src/sim/config";
+import { createBoard, swap, type Pos } from "../src/sim/board";
+import { currentRoundScore, newRun, playMove } from "../src/sim/run";
 import { legalMoves, pickMove, simulateRun, summarise } from "../debug/bot";
 
 describe("legalMoves", () => {

@@ -12,7 +12,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='27' font-size='27'>%F0%9F%8D%8A</text></svg>">
 <style>
   :root{
-    /* Read back by main.ts. env() is only usable from CSS, so it is parked on
+    /* Read back by src/game/client.ts. env() is only usable from CSS, so it is parked on
        custom properties the renderer can read via getComputedStyle. */
     --sat: env(safe-area-inset-top, 0px);
     --sar: env(safe-area-inset-right, 0px);
@@ -39,6 +39,10 @@
 <body>
   <div id="app"></div>
   <div id="boot">CAPPY'S ONSEN — warming up…</div>
-<script type="module" src="./main.ts"></script>
+<!-- The esbuild bundle (`scripts/build.mjs`). It loads, connects to the host
+     and then waits: nothing is drawn until the host's boot message arrives
+     with the player's saved progress, so "warming up" is what a page opened
+     without a host shows. -->
+<script type="module" src="./main.js"></script>
 </body>
 </html>

@@ -1,5 +1,16 @@
 import { defineConfig } from "vitest/config";
 
+/**
+ * The game's own test suite, carried over whole from before the port.
+ *
+ * It covers the sim — determinism, the refill order, charm purity, the balance
+ * numbers pinned from the workbook, save migration — plus the tuning bot and
+ * the client's host save. It touches neither the DOM nor Pixi nor the host, so
+ * it runs here exactly as it did under Vite. The template ships no test runner,
+ * which is the one deliberate addition to its shape: the daily-seed contract is
+ * the part of this game most worth protecting, and `oxlint` plus the
+ * conformance test say nothing about it.
+ */
 export default defineConfig({
   test: {
     // Several suites replay whole runs — 200 scripted moves for the determinism

@@ -10,11 +10,11 @@
  * "seed 42 + random policy + bot seed 7" replays identically. Tuning against a
  * bot you cannot reproduce is not tuning.
  */
-import { swap, type BoardState, type Pos } from "../src/board";
-import { rngInt } from "../src/rng";
-import { roundTarget, type BalanceConfig } from "../src/config";
-import type { CharmId } from "../src/charms";
-import { chooseCharm, currentRoundScore, newRun, playMove, type RunState } from "../src/run";
+import { swap, type BoardState, type Pos } from "../src/sim/board";
+import { rngInt } from "../src/sim/rng";
+import { roundTarget, type BalanceConfig } from "../src/sim/config";
+import type { CharmId } from "../src/sim/charms";
+import { chooseCharm, currentRoundScore, newRun, playMove, type RunState } from "../src/sim/run";
 
 export type Move = [Pos, Pos];
 export type Policy = "random" | "greedy";

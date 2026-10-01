@@ -444,3 +444,4 @@ loads and saves correctly from the live site path.
 | 6 Daily | ✅ done | UTC day boundary; two-profile board+offer parity verified; 15 permalink pages + sitemap |
 | 7 Meta | ✅ done | petals, all 24 charms, collection + décor; SAVE_VERSION 2 with migration; board effects added without bending rule 4 |
 | 8 Ship | built — 2 human gates | events + ad slots wired but INERT (site privacy page forbids both); catalog entry needs a site decision |
+| Platform port | ✅ done | single esbuild package on capybara-club-game-template; host-owned saves; ads off behind `ADS_ENABLED`; analytics, cross-promo and the Vercel/SEO build removed — see `docs/PORTING.md` |

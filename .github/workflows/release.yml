@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Authenticate npm for GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.SDK_PACKAGE_TOKEN }}" >> ~/.npmrc
+
+      # Derives package.json's version from the tag itself, rather than relying on
+      # a human to remember to bump it beforehand - matches the fix applied to
+      # capybara-club-sdk after a real tag/version mismatch happened there. Nothing
+      # in this repo's own pipeline currently reads package.json's version (the
+      # release asset is named from manifest.json's id instead), but this keeps the
+      # committed field from silently going stale, and costs nothing to keep correct.
+      - name: Set package.json version from the tag
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          runtime: node@24
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      # Keyed on the resolved playwright package version, not hashFiles('pnpm-lock.yaml')
+      # - the whole-lockfile hash meant any unrelated dependency bump invalidated this
+      # cache, forcing a fresh Chromium download nearly every run despite the browser
+      # version never actually changing (confirmed via real CI logs - 3-for-3 misses
+      # across bubble-drop's release history before this fix).
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright's Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      # Test build - HOST_ORIGIN matches the local-dev convention the harness expects
+      # (see capybara-club-sdk's README). Gates this release (below), and is also zipped
+      # and attached as a second release asset so capybara-club-assembler can
+      # independently re-run the conformance test itself later - the production build's
+      # baked-in HOST_ORIGIN makes it untestable by the same harness, since the harness
+      # can only serve its own host-page from localhost:3000.
+      - name: Build test artifact
+        run: pnpm build
+        env:
+          HOST_ORIGIN: http://localhost:3000
+
+      - name: Run conformance test
+        run: pnpm exec capybara-conformance-test ./dist
+
+      - name: Zip test artifact for independent re-verification
+        run: |
+          GAME_ID=$(node -e "console.log(require('./manifest.json').id)")
+          cd dist && zip -r "../${GAME_ID}-test.zip" .
+
+      # Real production build - only reached if the conformance test above passed. A
+      # sentinel, not a real origin - this repo has no business knowing which
+      # environment (prod vs dev preview) it'll end up deployed to. The assembler
+      # replaces this at assembly time, the one place that actually knows.
+      - run: pnpm build
+        env:
+          HOST_ORIGIN: __CAPYBARA_HOST_ORIGIN__
+
+      # Zip filename comes from manifest.json's id, matching what
+      # capybara-club-assembler's build.mjs looks for (`${game.id}.zip`) - this repo can
+      # be renamed freely without breaking the release pipeline. games-assembler
+      # downloads this asset directly via the GitHub API, no git involved.
+      - name: Zip build output
+        run: |
+          GAME_ID=$(node -e "console.log(require('./manifest.json').id)")
+          cd dist && zip -r "../${GAME_ID}.zip" .
+
+      - name: Create release with build as an asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # github.ref_name interpolated directly into a shell command is a real
+          # injection risk (Semgrep run-shell-injection) - git tag names aren't as
+          # restricted as they look and can contain shell metacharacters. Passed
+          # through an env var and quoted instead, never interpolated raw.
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" ./*.zip --title "$TAG" --generate-notes

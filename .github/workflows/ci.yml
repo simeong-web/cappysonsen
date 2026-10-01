@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Authenticate npm for GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.SDK_PACKAGE_TOKEN }}" >> ~/.npmrc
+
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          runtime: node@24
+          cache: true
+
+      - name: Validate manifest.json
+        run: node -e "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8'))"
+
+      - run: pnpm build
+        env:
+          # Just needs to be a valid value - this build's output isn't deployed anywhere.
+          HOST_ORIGIN: http://localhost:3000
+
+      - run: pnpm lint
+
+      # Added to the template's CI: this game carries its own test suite, and the
+      # rules it covers - the daily-seed contract above all (refill order, the
+      # replay hash, charm purity) - are the part of this repo most worth
+      # protecting. oxlint and the conformance test say nothing about them.
+      - run: pnpm typecheck
+
+      - run: pnpm test

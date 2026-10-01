@@ -12,8 +12,8 @@
  * board.test.ts, so a wrong order cannot simply be locked in here.
  */
 import { describe, it, expect } from "vitest";
-import { rngInt } from "../src/rng";
-import { serializeSave, parseSave } from "../src/save";
+import { rngInt } from "../src/sim/rng";
+import { serializeSave, parseSave } from "../src/sim/save";
 import {
   createBoard,
   swap,
@@ -23,7 +23,7 @@ import {
   validateBoard,
   type BoardState,
   type Pos,
-} from "../src/board";
+} from "../src/sim/board";
 
 /** FNV-1a over the grid and the RNG cursor: the two things replay depends on. */
 function hashBoard(state: BoardState): string {

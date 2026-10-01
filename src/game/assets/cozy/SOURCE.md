@@ -4,7 +4,7 @@ Chrome sprites from the **Cozy UI Pack (DEMO)** by **dobo_ui** —
 <https://dobo-ui.itch.io/>
 
 Used for UI chrome only: panels, buttons, cards, checkboxes, icons. Board tiles
-are custom work drawn at runtime in `game/tiles.ts` and are **not** from this
+are custom work drawn at runtime in `src/game/tiles.ts` and are **not** from this
 pack (CLAUDE.md, "Asset handling").
 
 The demo download ships no licence file — only `developerNote_dobo_ui.txt`

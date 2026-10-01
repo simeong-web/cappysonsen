@@ -7,10 +7,10 @@
  * genuine v1 envelope, not a simulated one.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg } from "../src/config";
-import { CHARMS, CHARM_IDS, canSkipDraft, rerollsFrom, type CharmId } from "../src/charms";
-import { MIGRATIONS, SAVE_VERSION, parseSave, serializeSave } from "../src/save";
-import { KEYS } from "../src/store";
+import { DEFAULT_CONFIG as cfg } from "../src/sim/config";
+import { CHARMS, CHARM_IDS, canSkipDraft, rerollsFrom, type CharmId } from "../src/sim/charms";
+import { MIGRATIONS, SAVE_VERSION, parseSave, serializeSave } from "../src/sim/save";
+import { KEYS } from "../src/sim/store";
 import {
   CHARM_COST,
   DECOR,
@@ -27,7 +27,7 @@ import {
   unlockCharm,
   unlockDecor,
   validateMeta,
-} from "../src/meta";
+} from "../src/sim/meta";
 import {
   chooseCharm,
   newRun,
@@ -36,9 +36,9 @@ import {
   rollCharmOffer,
   skipDraft,
   type RunState,
-} from "../src/run";
-import { swap, type BoardState, type Pos } from "../src/board";
-import { rngInt } from "../src/rng";
+} from "../src/sim/run";
+import { swap, type BoardState, type Pos } from "../src/sim/board";
+import { rngInt } from "../src/sim/rng";
 
 const NOW = 1_800_000_000_000;
 

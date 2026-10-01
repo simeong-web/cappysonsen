@@ -10,11 +10,11 @@
  * `debug/` is outside the purity rule, so Math.random and Date.now are fine
  * here — they seed runs, and nothing else.
  */
-import { DEFAULT_CONFIG as cfg, isLongSoak, roundTarget } from "../src/config";
-import { TILE_COLOURS, type BoardEvent, type Pos } from "../src/board";
-import { CHARMS, type CharmId } from "../src/charms";
-import { blissOf } from "../src/scoring";
-import { chooseCharm, currentRoundScore, newRun, playMove, type RunState } from "../src/run";
+import { DEFAULT_CONFIG as cfg, isLongSoak, roundTarget } from "../src/sim/config";
+import { TILE_COLOURS, type BoardEvent, type Pos } from "../src/sim/board";
+import { CHARMS, type CharmId } from "../src/sim/charms";
+import { blissOf } from "../src/sim/scoring";
+import { chooseCharm, currentRoundScore, newRun, playMove, type RunState } from "../src/sim/run";
 import { legalMoves, pickMove, simulateRun, summarise, type Policy, type RunSummary } from "./bot";
 
 // ── tile palette. Board art is Milestone 5; these are labels with a fill. ──

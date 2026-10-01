@@ -1,0 +1,40 @@
+version: 2
+
+registries:
+  # @mittell/capybara-club-sdk is now installed from GitHub Packages, not a private
+  # git dependency - this is a separate credential store from the SDK_PACKAGE_TOKEN
+  # Actions secret used in CI. Add the same PAT again under Settings > Secrets and
+  # variables > Dependabot.
+  sdk-repo:
+    type: npm-registry
+    url: https://npm.pkg.github.com
+    token: ${{secrets.SDK_PACKAGE_TOKEN}}
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    registries:
+      - sdk-repo
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

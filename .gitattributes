@@ -1,0 +1,19 @@
+# Normalise every text file to LF in the repository.
+#
+# core.autocrlf is true on this machine, so without this the working tree and
+# the object store disagree about line endings and CI on Linux sees a diff
+# against a checkout that looks identical. Pinning it here is cheap now and a
+# whole-tree renormalisation later.
+* text=auto eol=lf
+
+# Anything git should never touch.
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.gif   binary
+*.woff  binary
+*.woff2 binary
+*.mp3   binary
+*.ogg   binary

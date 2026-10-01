@@ -17,7 +17,7 @@ import {
   clampNum,
   isFiniteNum,
   type Migration,
-} from "../src/save";
+} from "../src/sim/save";
 
 interface FakeState {
   round: number;

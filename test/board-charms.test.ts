@@ -7,8 +7,8 @@
  * before they existed.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg } from "../src/config";
-import { boardEffectsFrom, freeSwapsFrom, skimsAtRoundStart, type CharmId } from "../src/charms";
+import { DEFAULT_CONFIG as cfg } from "../src/sim/config";
+import { boardEffectsFrom, freeSwapsFrom, skimsAtRoundStart, type CharmId } from "../src/sim/charms";
 import {
   EMPTY,
   NO_EFFECTS,
@@ -23,8 +23,8 @@ import {
   validateBoard,
   type BoardState,
   type Pos,
-} from "../src/board";
-import { newRun, playMove, type RunState } from "../src/run";
+} from "../src/sim/board";
+import { newRun, playMove, type RunState } from "../src/sim/run";
 
 const STONE = TILE_COLOURS.indexOf("stone");
 

@@ -3,11 +3,11 @@
  * or run end, and the end-to-end determinism that daily mode depends on.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg, roundTarget } from "../src/config";
-import { rngInt } from "../src/rng";
-import { swap, type BoardState, type Pos } from "../src/board";
-import { CHARM_IDS, type CharmId } from "../src/charms";
-import { roundTotal } from "../src/scoring";
+import { DEFAULT_CONFIG as cfg, roundTarget } from "../src/sim/config";
+import { rngInt } from "../src/sim/rng";
+import { swap, type BoardState, type Pos } from "../src/sim/board";
+import { CHARM_IDS, type CharmId } from "../src/sim/charms";
+import { roundTotal } from "../src/sim/scoring";
 import {
   chooseCharm,
   currentRoundScore,
@@ -17,7 +17,7 @@ import {
   playMove,
   rollCharmOffer,
   type RunState,
-} from "../src/run";
+} from "../src/sim/run";
 
 function legalMoves(board: BoardState): [Pos, Pos][] {
   const out: [Pos, Pos][] = [];

@@ -6,7 +6,7 @@
  * seed → run — and this file pins every link in it.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg } from "../src/config";
+import { DEFAULT_CONFIG as cfg } from "../src/sim/config";
 import {
   civilFromDays,
   dailyPageUrl,
@@ -23,12 +23,12 @@ import {
   utcDayOf,
   verdictOf,
   type DailyConfig,
-} from "../src/daily";
-import { chooseCharm, newRun, playMove, shareTextFor, validateRun, type RunState } from "../src/run";
-import { parseSave, serializeSave } from "../src/save";
-import { validateDailyProgress, validateEndlessProgress, KEYS } from "../src/store";
-import { swap, type BoardState, type Pos } from "../src/board";
-import { rngInt } from "../src/rng";
+} from "../src/sim/daily";
+import { chooseCharm, newRun, playMove, shareTextFor, validateRun, type RunState } from "../src/sim/run";
+import { parseSave, serializeSave } from "../src/sim/save";
+import { validateDailyProgress, validateEndlessProgress, KEYS } from "../src/sim/store";
+import { swap, type BoardState, type Pos } from "../src/sim/board";
+import { rngInt } from "../src/sim/rng";
 
 const daily: DailyConfig = cfg.daily;
 

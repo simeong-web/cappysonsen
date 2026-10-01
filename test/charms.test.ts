@@ -3,11 +3,11 @@
  * that makes the whole design work: drafting order cannot change a score.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg } from "../src/config";
-import { CHARMS, CHARM_IDS, charmScoreFns, isCharmId, type CharmId } from "../src/charms";
-import { moveBudgetFor } from "../src/run";
-import { rngInt } from "../src/rng";
-import { TILE_COLOURS } from "../src/board";
+import { DEFAULT_CONFIG as cfg } from "../src/sim/config";
+import { CHARMS, CHARM_IDS, charmScoreFns, isCharmId, type CharmId } from "../src/sim/charms";
+import { moveBudgetFor } from "../src/sim/run";
+import { rngInt } from "../src/sim/rng";
+import { TILE_COLOURS } from "../src/sim/board";
 import {
   emptyRoundScore,
   fold,
@@ -16,7 +16,7 @@ import {
   type ScoreContext,
   type ScoreDelta,
   type StepSummary,
-} from "../src/scoring";
+} from "../src/sim/scoring";
 
 const YUZU = TILE_COLOURS.indexOf("yuzu");
 const STONE = TILE_COLOURS.indexOf("stone");

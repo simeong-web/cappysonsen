@@ -1,0 +1,29 @@
+name: Knip
+
+# Weekly, not on every PR - same cost reasoning as gitleaks.yml/semgrep.yml. Run via
+# pnpm dlx rather than an installed devDependency, since this is an audit tool, not a
+# build dependency - keeps package.json clean for a tool only ever invoked here.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Authenticate npm for GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.SDK_PACKAGE_TOKEN }}" >> ~/.npmrc
+
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          runtime: node@24
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm dlx knip

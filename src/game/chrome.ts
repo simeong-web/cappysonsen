@@ -3,7 +3,7 @@
  *
  * Pack sprites are used for the frame around the game only. Board tiles are
  * custom work in `tiles.ts` (CLAUDE.md, "Asset handling"). Source and licence
- * note: `game/assets/cozy/SOURCE.md`.
+ * note: `src/game/assets/cozy/SOURCE.md` and `docs/ASSETS.md`.
  *
  * Most of the pack's art is SCALED rather than nine-sliced — see `stretched`
  * for why slicing hand-drawn borders smears their edge nicks into notches.
@@ -23,11 +23,13 @@ import { animate, easeOut } from "./tween";
 /**
  * Static imports, deliberately.
  *
- * Vite only fingerprints and emits an asset when it can see a literal path at
- * build time. Computing the URL at runtime (`new URL(variable, import.meta.url)`)
- * works in dev — the file is served from disk — and then silently ships a
- * bundle with no images in it. Importing each one binds the emitted, hashed,
- * `base: './'`-relative URL, so the bundle is correct from any subfolder.
+ * The bundler only emits an asset when it can see a literal path at build
+ * time. Computing the URL at runtime (`new URL(variable, import.meta.url)`)
+ * works against a dev server — the file is served from disk — and then silently
+ * ships a bundle with no images in it. Importing each one makes esbuild's
+ * `file` loader copy it to `dist/assets/` and bind its page-relative URL
+ * (`./assets/bar.png`), so the bundle is correct from any subfolder and from
+ * inside the platform's iframe. See `scripts/build.mjs`.
  */
 import barUrl from "./assets/cozy/bar.png";
 import panelUrl from "./assets/cozy/panel.png";

@@ -9,7 +9,7 @@
  * disagree, that is a renderer bug and it self-corrects rather than drifting.
  */
 import { Container, Graphics, Sprite, type Texture } from "pixi.js";
-import { WILD, type BoardEvent, type BoardState, type Pos } from "../src/board";
+import { WILD, type BoardEvent, type BoardState, type Pos } from "../sim/board";
 import { COLOURS, LAYOUT, TIMING, depthScale } from "./theme";
 import { animate, easeBack, easeInOut, easeLand, easeOut, moveTo, wait } from "./tween";
 import type { TileArt } from "./tiles";

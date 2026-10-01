@@ -8,11 +8,16 @@
  * The renderer owns no game logic. It holds a RunState, hands moves to the sim,
  * and paints what comes back — score included. Anything it had to work out for
  * itself would be a second implementation of the rules, and the two would drift.
+ *
+ * NOTHING HERE RUNS ON IMPORT. The host owns when a game starts and what it
+ * starts with, so the whole client is behind `startClient`, which the host's
+ * boot message calls with the player's saved progress. Opening a run at import
+ * time would mean throwing it away a moment later when the save landed.
  */
 import { Application, Container, Graphics, Text } from "pixi.js";
-import { DEFAULT_CONFIG as cfg, isLongSoak, roundTarget } from "../src/config";
-import { CHARMS, type CharmId } from "../src/charms";
-import { blissOf } from "../src/scoring";
+import { DEFAULT_CONFIG as cfg, isLongSoak, roundTarget } from "../sim/config";
+import { CHARMS, type CharmId } from "../sim/charms";
+import { blissOf } from "../sim/scoring";
 import {
   chooseCharm,
   currentRoundScore,
@@ -22,9 +27,8 @@ import {
   shareTextFor,
   type RunMode,
   type RunState,
-} from "../src/run";
-import { dailyNumberOf, dateKeyOfDaily, seedOfDaily } from "../src/daily";
-import { KEYS, validateDailyProgress, validateEndlessProgress } from "../src/store";
+} from "../sim/run";
+import { dailyNumberOf, dateKeyOfDaily, seedOfDaily } from "../sim/daily";
 import {
   DECOR,
   DECOR_IDS,
@@ -32,32 +36,20 @@ import {
   canUnlockDecor,
   chooseDecor,
   collection,
-  newMeta,
   petalsFor,
   poolFor,
   recordRun,
   unlockCharm,
   unlockDecor,
-  validateMeta,
-  type DecorId,
   type MetaState,
-} from "../src/meta";
-import { copyText, load, save } from "./storage";
-import { draftEvents, roundCleared, runEnd, runStart } from "../src/analytics";
-import { reviveWithMoves } from "../src/run";
-import {
-  hasRewardedAds,
-  loadPromos,
-  showRewarded,
-  track,
-  trackAll,
-  type PromoGame,
-} from "./telemetry";
-import { swap, type Pos } from "../src/board";
+} from "../sim/meta";
+import { reviveWithMoves } from "../sim/run";
+import { swap, type Pos } from "../sim/board";
+import type { BootContext, Host, RewardPlacement } from "../platform/host";
+import { copyText } from "./clipboard";
+import { loadHostSave, toHostSave, type Progress } from "./progress";
 
-/** Moves granted by the "+5 moves" rewarded slot (SPEC §6). */
-const AD_EXTRA_MOVES = 5;
-import { COLOURS, LAYOUT, SLICES, textStyle } from "./theme";
+import { COLOURS, LAYOUT, textStyle } from "./theme";
 import { buildSparkTexture, buildTileArt, buildWildArt, type TileArt } from "./tiles";
 import { BoardView } from "./board-view";
 import {
@@ -68,23 +60,24 @@ import {
   CARD_ASPECT,
   cardHeightFor,
   loadChrome,
-  panel,
   stretched,
   type ChromeTextures,
 } from "./chrome";
 import { animate, easeOut, useTicker } from "./tween";
 
+/** Moves granted by the "+5 moves" rewarded slot (SPEC §6). */
+const AD_EXTRA_MOVES = 5;
+
+/** Just under the SDK's score ceiling, which rejects `>= 1e9` outright. */
+const MAX_REPORTED_SCORE = 999_999_999;
+
 /**
- * Which puzzle to open on. `?daily=N` deep-links a specific one (that is what
- * the /daily/N pages link to); anything else lands on the menu.
+ * Build-time switch for the automation handle below. Off in every build unless
+ * `DEV_HANDLE=1` is set; while it is off, the one branch that reads it compiles
+ * to `if (false)`. It replaces Vite's `import.meta.env.DEV`, which esbuild does
+ * not provide.
  */
-function routeOf(search: string): { mode: RunMode; daily: number } | null {
-  const params = new URLSearchParams(search);
-  const d = params.get("daily");
-  if (d !== null && /^\d+$/.test(d)) return { mode: "daily", daily: Number(d) };
-  if (params.get("mode") === "endless") return { mode: "endless", daily: 0 };
-  return null;
-}
+declare const DEV_HANDLE: boolean;
 
 class Game {
   private state: RunState;
@@ -121,10 +114,12 @@ class Game {
     art: TileArt[],
     wild: TileArt,
     spark: ReturnType<typeof buildSparkTexture>,
+    private readonly host: Host,
+    private saved: Progress,
   ) {
-    // Date.now() is fine here — src/ stays clock-free, the client supplies now.
+    // Date.now() is fine here — src/sim stays clock-free, the client supplies now.
     this.todayN = dailyNumberOf(cfg.daily, Date.now());
-    this.meta = load(KEYS.meta, validateMeta) ?? newMeta();
+    this.meta = saved.meta;
     this.state = newRun(cfg, seedOfDaily(cfg.daily, this.todayN), "daily");
     this.board = new BoardView(art, wild, spark, (a, b) => void this.attempt(a, b));
     this.buildHud();
@@ -137,15 +132,10 @@ class Game {
     this.layout();
     this.refresh(true);
 
-    // Cross-promo, fetched once. Missing file = no panel, no error.
-    void loadPromos("cappys-onsen").then((list) => {
-      this.promos = list;
-    });
-
-    const route = routeOf(window.location.search);
-    if (route === null) this.showMenu();
-    else if (route.mode === "daily") this.startDaily(route.daily);
-    else this.startEndless();
+    // Always the menu. The `?daily=N` deep link that used to route past it
+    // existed for the /daily/N permalink pages, which this build does not have;
+    // see docs/PORTING.md.
+    this.showMenu();
 
     app.ticker.add(() => {
       this.warmth.tick();
@@ -163,7 +153,7 @@ class Game {
    * day. A record for any other number is last week's puzzle and is discarded.
    */
   private startDaily(n: number): void {
-    const saved = load(KEYS.daily, validateDailyProgress);
+    const saved = this.saved.daily;
     this.mode = "daily";
     this.dailyN = n;
     this.state =
@@ -173,12 +163,11 @@ class Game {
     this.afterStart();
     if (this.state.phase === "over") this.showRunEnd();
     else if (this.state.phase === "drafting") this.showDraft();
-    else track(runStart(this.state, this.dailyN, this.meta.unlockedCharms.length));
   }
 
   /** Endless resumes too, but a finished endless run just rolls into a new one. */
   private startEndless(fresh = false): void {
-    const saved = fresh ? null : load(KEYS.endless, validateEndlessProgress);
+    const saved = fresh ? null : this.saved.endless;
     this.mode = "endless";
     this.dailyN = 0;
     this.state =
@@ -187,7 +176,6 @@ class Game {
         : newRun(cfg, Math.floor(Math.random() * 2 ** 31), "endless", poolFor(this.meta));
     this.afterStart();
     if (this.state.phase === "drafting") this.showDraft();
-    else track(runStart(this.state, 0, this.meta.unlockedCharms.length));
   }
 
   private afterStart(): void {
@@ -199,7 +187,6 @@ class Game {
     this.persist();
   }
 
-  /** Written after every move, so a closed tab is never a lost daily. */
   /**
    * Bank the run's petals. `lastAwarded` guards the one case that would
    * duplicate them: a finished run reloaded from storage re-enters showRunEnd.
@@ -209,17 +196,32 @@ class Game {
     if (this.awardedFor === key) return;
     this.awardedFor = key;
     this.lastPetals = Math.floor(petalsFor(this.state) * multiplier);
-    this.meta = recordRun(this.meta, this.state, multiplier);
-    save(KEYS.meta, this.meta, Date.now());
+    this.saveMeta(recordRun(this.meta, this.state, multiplier));
   }
 
+  /** Written after every move, so a closed tab is never a lost daily. */
   private persist(): void {
-    const now = Date.now();
     if (this.mode === "daily") {
-      save(KEYS.daily, { dailyNumber: this.dailyN, run: this.state }, now);
+      this.saved = { ...this.saved, daily: { dailyNumber: this.dailyN, run: this.state } };
     } else {
-      save(KEYS.endless, { run: this.state }, now);
+      this.saved = { ...this.saved, endless: { run: this.state } };
     }
+    this.sendProgress();
+  }
+
+  /** Petals, unlocks, décor — the record that outlives any one run. */
+  private saveMeta(meta: MetaState): void {
+    this.meta = meta;
+    this.saved = { ...this.saved, meta };
+    this.sendProgress();
+  }
+
+  /**
+   * One value, handed to the host whole. What used to be three localStorage
+   * keys is three fields of it now — see `progress.ts`.
+   */
+  private sendProgress(): void {
+    this.host.saveProgress(toHostSave(this.saved, Date.now()));
   }
 
   // ───────────────────────────────────────────────────────── chrome
@@ -410,14 +412,28 @@ class Game {
     this.persist();
 
     if (this.state.phase === "drafting") {
-      const ev = roundCleared(this.state, isLongSoak(cfg, this.state.round));
-      if (ev) track(ev);
       this.showDraft();
     } else if (this.state.phase === "over") {
       this.awardPetals();
-      track(runEnd(this.state, this.dailyN, this.lastPetals));
+      this.reportRunScore();
       this.showRunEnd();
     }
+  }
+
+  /**
+   * The one number the host wants from a finished run: the warmth banked
+   * across every round.
+   *
+   * Reported here — where a move ends a run — and nowhere else, so a finished
+   * daily reopened from the save (which goes straight to the run-end panel)
+   * cannot report the same run twice. Rounded because the host wants a plain
+   * number, and capped below the SDK's plausibility ceiling (1e9, which it
+   * rejects rather than clamps) so a monster endless run still lands as a
+   * score instead of vanishing.
+   */
+  private reportRunScore(): void {
+    const score = Math.max(0, Math.round(this.state.totalScore));
+    this.host.reportScore(Math.min(score, MAX_REPORTED_SCORE));
   }
 
   // ───────────────────────────────────────────────────────── overlays
@@ -428,7 +444,6 @@ class Game {
   private lastShareText = "";
   private awardedFor = "";
   private lastPetals = 0;
-  private promos: PromoGame[] = [];
   private revivedThisRun = false;
   private doubledThisRun = false;
 
@@ -522,10 +537,11 @@ class Game {
       layer.addChild(owned);
     }
 
-    // A reroll button appears for a charm-granted reroll, or for an ad when an
-    // SDK is loaded. Neither shows otherwise.
+    // A reroll button appears for a charm-granted reroll, or for an ad when ads
+    // are switched on (`ADS_ENABLED`, false in every build today). Neither
+    // shows otherwise.
     const freeRerolls = this.state.rerollsLeft > 0;
-    if (freeRerolls || hasRewardedAds()) {
+    if (freeRerolls || this.adsAllowed()) {
       const w = Math.min(200, inner);
       const reroll = new Button(this.tex, freeRerolls ? "Reroll" : "Watch ad · reroll", {
         width: w,
@@ -548,9 +564,6 @@ class Game {
   }
 
   private async take(id: CharmId, card: CharmCard): Promise<void> {
-    // Every charm the draft SHOWED is reported, not just the one taken. Picked
-    // over offered is the charm balance data (SPEC §6).
-    trackAll(draftEvents(this.state.offer ?? [], id, this.state.round));
     card.setState("claimed");
     await card.pulse();
     this.state = chooseCharm(cfg, this.state, id);
@@ -599,13 +612,14 @@ class Game {
 
     const buttonW = Math.min(240, inner - pad * 2);
     const buttonH = 54;
-    // Ad affordances only exist when an SDK does; otherwise the panel is
-    // exactly the panel it was before Milestone 8.
-    const ads = hasRewardedAds();
+    // Ad affordances only exist when ads are switched on; otherwise the panel
+    // is exactly the panel it was before Milestone 8. With `ADS_ENABLED` false
+    // — every build today — neither button is offered at all, rather than
+    // offered and then answering "no reward this time".
+    const ads = this.adsAllowed();
     const canRevive =
       ads && !this.revivedThisRun && (this.state.rounds[this.state.rounds.length - 1]?.cleared === false);
     const canDouble = ads && !this.doubledThisRun && this.lastPetals > 0;
-    const promo = this.promos[0];
     const buttonCount = 2 + (canRevive ? 1 : 0) + (canDouble ? 1 : 0);
     const contentH =
       pad +
@@ -616,7 +630,6 @@ class Game {
       18 +
       buttonH * buttonCount +
       10 * (buttonCount - 1) +
-      (promo ? 14 + 46 : 0) +
       pad;
 
     const boxH = Math.min(contentH, this.height - 16);
@@ -714,43 +727,48 @@ class Game {
     back.x = (this.width - buttonW) / 2;
     back.y = y;
     layer.addChild(back);
-    y += buttonH + 14;
-
-    // ── cross-promo: the warmest lead you will ever have (SPEC §6) ──
-    if (promo) {
-      const promoText = new Text({
-        text: `Also from Capybara Club\n${promo.icon}  ${promo.title}`,
-        style: { ...textStyle(13, COLOURS.inkSoft, "600"), align: "center", lineHeight: 18 },
-      });
-      promoText.anchor.set(0.5, 0);
-      promoText.x = this.width / 2;
-      promoText.y = y;
-      promoText.eventMode = "static";
-      promoText.cursor = "pointer";
-      promoText.on("pointertap", () => {
-        window.location.href = `../../${promo.id}/`;
-      });
-      layer.addChild(promoText);
-    }
+    // The cross-promo line that used to sit here fetched `../../games.json` and
+    // navigated the page to a sibling game. Inside the platform's iframe the
+    // first is a guaranteed 404 and the second would walk the frame off the
+    // host, so it is gone; the platform's own catalogue is the cross-promo now.
   }
 
   // ───────────────────────────────────────────── REWARDED AD SLOTS
   // SPEC §6's three "player-wanted" moments. Every one of these is hidden
-  // unless an ad SDK is present (`hasRewardedAds()`), so the shipped build
-  // shows none of them. See game/telemetry.ts for why that is deliberate.
+  // unless ads are switched on (`adsAllowed()`), so the shipped build shows
+  // none of them. See src/platform/host.ts for why that is deliberate.
+
+  /**
+   * The gate every rewarded slot asks. `host.adsEnabled` is `ADS_ENABLED`,
+   * false unless the build sets `ADS=1`, because this platform's SDK has no ad
+   * API. The code behind it is kept so that switching it on is a build flag
+   * plus `Host.requestRewardedAd`, not a re-derivation.
+   */
+  private adsAllowed(): boolean {
+    return this.host.adsEnabled;
+  }
+
+  /** Ask the host for a rewarded ad. False — no reward — on every failure path. */
+  private async rewarded(placement: RewardPlacement): Promise<boolean> {
+    if (!this.adsAllowed()) return false;
+    try {
+      return await this.host.requestRewardedAd(placement);
+    } catch {
+      return false;
+    }
+  }
 
   /** +5 moves on the round that just ended the run. */
   private async adExtraMoves(button: Button): Promise<void> {
     button.setEnabled(false);
-    const earned = await showRewarded("extra_moves");
+    const earned = await this.rewarded("extra_moves");
     if (!earned) {
       button.setEnabled(true);
       return;
     }
     this.revivedThisRun = true;
     // Take the petals back: the run is not over after all.
-    this.meta = { ...this.meta, petals: this.meta.petals - this.lastPetals };
-    save(KEYS.meta, this.meta, Date.now());
+    this.saveMeta({ ...this.meta, petals: this.meta.petals - this.lastPetals });
     this.awardedFor = "";
     this.state = reviveWithMoves(cfg, this.state, AD_EXTRA_MOVES);
     this.clearOverlay();
@@ -762,7 +780,7 @@ class Game {
   /** A second look at the draft, without spending a charm's allowance. */
   private async adReroll(button: Button): Promise<void> {
     button.setEnabled(false);
-    if (!(await showRewarded("reroll_draft"))) {
+    if (!(await this.rewarded("reroll_draft"))) {
       button.setEnabled(true);
       return;
     }
@@ -774,7 +792,7 @@ class Game {
   /** Twice the run's petals. Once per run. */
   private async adDoublePetals(button: Button): Promise<void> {
     button.setEnabled(false);
-    if (!(await showRewarded("double_petals"))) {
+    if (!(await this.rewarded("double_petals"))) {
       button.setEnabled(true);
       return;
     }
@@ -807,7 +825,7 @@ class Game {
     const buttonW = Math.min(260, inner - pad * 2);
     const buttonH = 58;
 
-    const saved = load(KEYS.daily, validateDailyProgress);
+    const saved = this.saved.daily;
     const todayDone =
       saved !== null && saved.dailyNumber === this.todayN && saved.run.phase === "over";
     const todayStarted = saved !== null && saved.dailyNumber === this.todayN && !todayDone;
@@ -897,8 +915,8 @@ class Game {
 
   /**
    * Dev-only handle used to drive the client from automated checks. Gated on
-   * import.meta.env.DEV, so Vite strips it entirely from the production bundle
-   * — nothing here ships.
+   * the `DEV_HANDLE` build flag, so in every normal build the only reference to
+   * it sits behind `if (false)` and nothing here is reachable.
    */
   devHandle() {
     return {
@@ -1017,8 +1035,7 @@ class Game {
       const row = Math.floor(i / perRow);
       const card = new CharmCard(this.tex, CHARMS[item.id].name, "", cardW, () => {
         if (!item.unlocked && canUnlockCharm(this.meta, item.id)) {
-          this.meta = unlockCharm(this.meta, item.id);
-          save(KEYS.meta, this.meta, Date.now());
+          this.saveMeta(unlockCharm(this.meta, item.id));
           this.showCollection();
         }
       });
@@ -1056,12 +1073,13 @@ class Game {
         fontSize: 12,
         variant: active ? "primary" : "light",
         onTap: () => {
-          this.meta = owned
-            ? chooseDecor(this.meta, id)
-            : canUnlockDecor(this.meta, id)
-              ? chooseDecor(unlockDecor(this.meta, id), id)
-              : this.meta;
-          save(KEYS.meta, this.meta, Date.now());
+          this.saveMeta(
+            owned
+              ? chooseDecor(this.meta, id)
+              : canUnlockDecor(this.meta, id)
+                ? chooseDecor(unlockDecor(this.meta, id), id)
+                : this.meta,
+          );
           this.layout();
           this.showCollection();
         },
@@ -1142,7 +1160,17 @@ function mix(a: number, b: number, t: number): number {
 
 // ───────────────────────────────────────────────────────── boot
 
-async function boot(): Promise<void> {
+/**
+ * Bring up Pixi, load the chrome, and open the game on whatever the host saved.
+ *
+ * The texture load is the one step with a genuine "asset_load" failure mode —
+ * fourteen PNGs fetched relative to the page — so it is caught on its own and
+ * reported under that category. Anything else that fails here is a script
+ * fault. Either way the player sees the boot line say so, and the error is
+ * handled rather than rethrown, so the global handlers in `platform/host.ts`
+ * do not report it a second time.
+ */
+async function boot(context: BootContext): Promise<void> {
   const app = new Application();
   await app.init({
     background: COLOURS.waterDeep,
@@ -1157,22 +1185,64 @@ async function boot(): Promise<void> {
   document.getElementById("app")?.appendChild(app.canvas);
   useTicker(app.ticker);
 
-  const chrome = await loadChrome();
+  let chrome: ChromeTextures;
+  try {
+    chrome = await loadChrome();
+  } catch (err) {
+    throw new BootFailure(err, "asset_load");
+  }
   const art = buildTileArt(app.renderer, app.renderer.resolution);
   const wild = buildWildArt(app.renderer, app.renderer.resolution);
   const spark = buildSparkTexture(app.renderer, app.renderer.resolution);
 
-  const game = new Game(app, chrome, art, wild, spark);
-  if (import.meta.env.DEV) {
+  const game = new Game(app, chrome, art, wild, spark, context.host, loadHostSave(context.savedProgress));
+  if (DEV_HANDLE) {
     (window as unknown as Record<string, unknown>)["__onsen"] = game.devHandle();
   }
   document.getElementById("boot")?.remove();
   document.body.dataset["ready"] = "1";
 }
 
-void boot().catch((err: unknown) => {
-  const boot = document.getElementById("boot");
-  if (boot) boot.textContent = `Failed to start: ${String(err)}`;
-  document.body.dataset["error"] = String(err);
-  throw err;
-});
+/** A boot failure, tagged with the category it should be reported under. */
+class BootFailure extends Error {
+  constructor(
+    readonly reason: unknown,
+    readonly errorType: "asset_load" | "script",
+  ) {
+    super(String(reason));
+  }
+}
+
+let started = false;
+
+/**
+ * The host has booted us: take the save it is holding and start playing.
+ *
+ * Called once. Nothing above this line has run until now — there is no canvas
+ * and no run — because the saved progress arrives with this call and opening a
+ * run before it would mean opening one twice.
+ */
+export function startClient(context: BootContext): void {
+  if (started) return;
+  started = true;
+  setMuted(context.muted);
+  void boot(context).catch((err: unknown) => {
+    const failure = err instanceof BootFailure ? err : new BootFailure(err, "script");
+    const line = document.getElementById("boot");
+    if (line) line.textContent = `Failed to start: ${failure.message}`;
+    document.body.dataset["error"] = failure.message;
+    console.error(failure.reason);
+    context.host.reportError(`boot failed: ${failure.message}`, failure.errorType);
+  });
+}
+
+/**
+ * The host's mute switch.
+ *
+ * Cappy's Onsen has no audio, so there is nothing to mute. Kept because the
+ * host sends the state on boot and on every change, and a game that ignores the
+ * message entirely is a game that will not notice when it does grow a sound.
+ */
+export function setMuted(_muted: boolean): void {
+  /* no audio to mute yet */
+}

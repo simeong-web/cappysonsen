@@ -8,7 +8,7 @@
  * numbers here deliberately. Never nudge a literal to make a test pass.
  */
 import { describe, it, expect } from "vitest";
-import { DEFAULT_CONFIG as cfg, roundTarget, isLongSoak } from "../src/config";
+import { DEFAULT_CONFIG as cfg, roundTarget, isLongSoak } from "../src/sim/config";
 import {
   baseDelta,
   blissOf,
@@ -19,9 +19,9 @@ import {
   summariseSteps,
   type ScoreContext,
   type StepSummary,
-} from "../src/scoring";
-import { createBoard, resolve, swap, type BoardEvent, type Pos } from "../src/board";
-import { rngInt } from "../src/rng";
+} from "../src/sim/scoring";
+import { createBoard, resolve, swap, type BoardEvent, type Pos } from "../src/sim/board";
+import { rngInt } from "../src/sim/rng";
 
 // ── The sheet's Assumptions that the sim itself does not hold ──────────────
 // These model an average board; the engine has no notion of them. They are
